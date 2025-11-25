@@ -9,7 +9,16 @@ const app = express();
 // Enable CORS for all routes
 app.use(cors());
 
-const upload = multer({ dest: 'uploads/' });
+const storage = multer.diskStorage({
+    destination: 'uploads/',
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const fileExt = file.originalname.split('.').pop();
+        cb(null, file.fieldname + '-' + uniqueSuffix + '.' + fileExt);
+    }
+});
+
+const upload = multer({ storage: storage });
 
 app.post('/upload', upload.single('image'), (req, res) => {
     console.log("request are coming...", req.file);
