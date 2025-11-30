@@ -3,7 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs');
-// const path = require('path');
+const path = require('path');
 
 const app = express();
 
@@ -40,6 +40,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
         const userId = req.body.userId || 'default-user';
         const timestamp = req.body.timestamp || Date.now();
         const imageType = req.body.imageType;
+        const face = imageType.includes('front') ? 'front' : imageType.includes('back') ? 'back' : imageType;
         const oldPath = req.file.path;
         const fileExt = req.file.originalname.split('.').pop().toLowerCase();
         const newFilename = `${userId}-${timestamp}-${imageType}.${fileExt}`;
@@ -54,17 +55,38 @@ app.post('/upload', upload.single('image'), (req, res) => {
                 message: 'Image uploaded successfully',
                 filename: newFilename,
                 originalname: req.file.originalname,
+                face: face,
                 timestamp: timestamp
             });
         });
-        // res.json({
-        //     message: 'Image uploaded successfully',
-        //     filename: req.file.filename,
-        //     originalname: req.file.originalname
-        // });
     } catch(error){
         console.log("Failed to upload image", error);
     }
+});
+
+app.get('/cdn/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(__dirname, 'uploads', filename);
+
+    // Add CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+
+    // Set proper Content-Type based on file extension
+    const ext = path.extname(filename).toLowerCase();
+    const mimeTypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml'
+    };
+    
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+    
+    res.sendFile(filePath);
 });
 
 app.get('/', (req, res) => {
