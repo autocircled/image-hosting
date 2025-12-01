@@ -35,15 +35,16 @@ const upload = multer({
 
 app.post('/upload', upload.single('image'), (req, res) => {
     console.log("request are coming...", req.file);
-    console.log("user id is in request", req.body.userId);
+    console.log("lead id is in request", req.body.leadId);
+    const api_url = req.body.api_url;
     try{
-        const userId = req.body.userId || 'default-user';
-        const timestamp = req.body.timestamp || Date.now();
+        const leadId = req.body.leadId || 'default-user';
+        const timestamp = Date.now();
         const imageType = req.body.imageType;
         const face = imageType.includes('front') ? 'front' : imageType.includes('back') ? 'back' : imageType;
         const oldPath = req.file.path;
         const fileExt = req.file.originalname.split('.').pop().toLowerCase();
-        const newFilename = `${userId}-${timestamp}-${imageType}.${fileExt}`;
+        const newFilename = `${leadId}-${timestamp}-${imageType}.${fileExt}`;
         const newPath = `uploads/${newFilename}`;
         fs.rename(oldPath, newPath, (err) => {
             if (err) {
@@ -52,11 +53,12 @@ app.post('/upload', upload.single('image'), (req, res) => {
             }
             
             res.json({
+                status: 'success',
                 message: 'Image uploaded successfully',
+                leadId: leadId,
                 filename: newFilename,
-                originalname: req.file.originalname,
                 face: face,
-                timestamp: timestamp
+                api_url: api_url
             });
         });
     } catch(error){
