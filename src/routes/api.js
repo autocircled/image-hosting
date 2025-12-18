@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
 const axios = require('axios');
+const { extractTextFromImage } = require("../utils/helper");
 
 const storage = multer.diskStorage({
     destination: 'uploads/',
@@ -43,11 +44,9 @@ router.post('/upload', upload.single('image'), async (req, res) => {
         const newFilename = `${leadId}-${timestamp}-${imageType}.${fileExt}`;
         const newPath = `uploads/${newFilename}`;
         await fs.promises.rename(oldPath, newPath);
-        const formData = new FormData();
-        formData.append('front_image', fs.createReadStream(newPath));
-        const verificationUrl = process.env.DIDIT_API_URL;
-        console.log(verificationUrl)
+        
         try {
+            const result = await extractTextFromImage(newPath);
             
             return res.json({
                 status: 'success',
@@ -55,7 +54,7 @@ router.post('/upload', upload.single('image'), async (req, res) => {
                 leadId: leadId,
                 filename: newFilename,
                 face: face,
-                verification: "coming soon"
+                doc_type: result
             });
         } catch (err) {
             console.log("Failed to validate", err);
