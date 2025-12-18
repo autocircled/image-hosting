@@ -48,24 +48,14 @@ router.post('/upload', upload.single('image'), async (req, res) => {
         const verificationUrl = process.env.DIDIT_API_URL;
         console.log(verificationUrl)
         try {
-            const verificationResponse = await axios.request({
-                url: verificationUrl,
-                method: 'POST',
-                headers: {
-                    accept: 'application/json',
-                    'x-api-key': process.env.DIDIT_API_KEY,
-                    ...formData.getHeaders()  // This adds the proper content-type with boundary
-                },
-                data: formData
-            });
-            const verificationResult = verificationResponse.data;
+            
             return res.json({
                 status: 'success',
                 message: 'Image uploaded successfully',
                 leadId: leadId,
                 filename: newFilename,
                 face: face,
-                verification: verificationResult
+                verification: "coming soon"
             });
         } catch (err) {
             console.log("Failed to validate", err);
