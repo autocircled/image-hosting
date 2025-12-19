@@ -1,7 +1,7 @@
 const conf = require("../conf/conf");
 const { Client, ID, TablesDB, Query, Permission, Role } = require("appwrite");
 
-class Service {
+class APIService {
     client = new Client();
     tablesDB;
     constructor() {
@@ -59,4 +59,4 @@ class Service {
 }
 
 // const service = new Service();
-module.exports = Service;
+module.exports = APIService;
