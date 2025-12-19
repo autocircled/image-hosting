@@ -10,7 +10,7 @@ const preprocessImage = async(imagePath) => {
         .normalize()
         .median(3) // Noise reduction
         .sharpen({ sigma: 1.2 }) //{ sigma: 2, m1: 1, m2: 2 }
-        .threshold(150)
+        // .threshold(150)
         .toFile(outputPath);
         
     return outputPath;
@@ -54,6 +54,7 @@ const detectDocumentType = (text) => {
                 /dpryers license/i,
                 /driver license/i,
                 /drivers? license/i,
+                /driving? licence/i,
                 /driver'?s? licence/i,
                 /dl[#:]?\s*\d+/i,
                 /\b(class|restrictions|endorsements)\s*:/i
@@ -119,7 +120,8 @@ const detectDocumentType = (text) => {
     return {
         primaryType: results[0]?.type || 'UNKNOWN',
         allTypes: results,
-        isDocument: results.length > 0
+        isDocument: results.length > 0,
+        text: text
     };
 }
 
