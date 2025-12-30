@@ -29,5 +29,7 @@ const upload = multer({
 router.post('/upload', upload.single('image'), LeadController.upload);
 router.get('/cdn/:filename', LeadController.getFile);
 router.post('/lead/create', LeadController.init);
+router.get('/verification/callback', LeadController.handleCallback);
+router.get('/session/create/:userId', LeadController.sessionCreate);
 
 module.exports = router;

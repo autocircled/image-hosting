@@ -6,7 +6,6 @@ class APIService {
     tablesDB;
     constructor() {
         this.client
-            .setDevKey(conf.appwriteDevKey)
             .setEndpoint(conf.appwriteUrl)
             .setProject(conf.appwriteProjectId);
 
@@ -52,6 +51,17 @@ class APIService {
             } else {
                 return "rowId is required to update row";
             }
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    async getSettings() {
+        try {
+            return await this.tablesDB.listRows({
+                databaseId: conf.appwriteDatabaseId,
+                tableId: "settings",
+            })
         } catch (error) {
             throw error;
         }
