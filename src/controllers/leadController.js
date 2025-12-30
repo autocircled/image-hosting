@@ -183,7 +183,7 @@ const createLead = async (sessionData, imageUrls) => {
         imageUrls.forEach((image) => {
             data[`${image.face}_uri`] = image?.url
         })
-        const response = await service.createLead(data)
+        await service.createLead(data)
     } catch (error) {
         console.log("Error updating appwrite", error)
     }
