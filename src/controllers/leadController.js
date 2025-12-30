@@ -178,7 +178,7 @@ const createLead = async (sessionData, imageUrls) => {
             id_type: document_type,
             expiry_date: expiration_date,
             full_name: full_name,
-            assets_path: assetsCDN + 'cdn/'
+            assets_path: assetsCDN
         }
         imageUrls.forEach((image) => {
             data[`${image.face}_uri`] = image?.url
