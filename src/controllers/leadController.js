@@ -43,15 +43,17 @@ const LeadController = {
         const { verificationSessionId } = req.query;
         const sessionData = await fetchSession(verificationSessionId)
         const imageUrls = await fileDownloader(sessionData)
+
+        // return res.json({
+        //     imageUrls,
+        //     sessionData
+        // })
             
         await createLead(sessionData, imageUrls)
 
         res.redirect(`${process.env.FRONTEND_URL}/thank-you`);
 
-        // res.json({
-        //     imageUrls,
-        //     sessionData
-        // })
+        
     },
     sessionCreate: (req, res) => {
         const { userId } = req.params;
@@ -105,7 +107,7 @@ const fetchSession = async (verificationSessionId) => {
 const fileDownloader = async (sessionData) => {
     const verificationSessionId = sessionData.session_id
     const imageUrls = []
-    const { id_verification, face_match } = sessionData
+    const { id_verification, liveness, face_match } = sessionData
     if(id_verification){
         const { full_front_image, full_back_image } = id_verification
         if(full_front_image){
@@ -118,6 +120,16 @@ const fileDownloader = async (sessionData) => {
             imageUrls.push({
                 "url": full_back_image,
                 "face": "back"
+            })
+        }
+    }
+
+    if(liveness){
+        const { video_url } = liveness
+        if(video_url){
+            imageUrls.push({
+                "url": video_url,
+                "face": "video"
             })
         }
     }
@@ -140,7 +152,10 @@ const fileDownloader = async (sessionData) => {
                 const response = await fetch(data.url)
                 // console.log("response", response)
                 const buffer = await response.arrayBuffer()
-                const slug = `${verificationSessionId}-${index}.jpg`
+
+                const slug = data.face === 'video' 
+                    ? `${verificationSessionId}.webm` 
+                    : `${verificationSessionId}-${index}.jpg`
                 const filePath = path.join(uploadDir, slug)
                 await fs.promises.writeFile(filePath, Buffer.from(buffer))
                 return {
@@ -148,14 +163,16 @@ const fileDownloader = async (sessionData) => {
                     "face": data.face
                 }
             } catch (error) {
-                console.log("Error downloading image", error)
+                console.log("Error downloading image", error);
+                return null;
             }
             });
 
-        const rerults = await Promise.all(downloadPromises);
-        return rerults
+        const results = await Promise.all(downloadPromises);
+        return results.filter(result => result !== null);
     } catch (error) {
-        console.log("Error downloading images", error)
+        console.log("Error downloading images", error);
+        throw error;
     }
 }
 
@@ -166,18 +183,37 @@ const createLead = async (sessionData, imageUrls) => {
     const assetsCDN = cdnPathRow.value.endsWith('/') ? cdnPathRow.value : cdnPathRow.value + '/';
 
     // update appwrite
-    const { session_id, status, vendor_data = "", id_verification = {}} = sessionData
-    const {document_type = "", expiration_date = "", full_name = "", gender = "", address = ""} = id_verification
+    const { 
+        session_id,
+        status,
+        vendor_data = "",
+        id_verification = {},
+        ip_analysis = {}
+    } = sessionData
+    const {
+        document_type = "",
+        expiration_date = "",
+        full_name = "",
+        date_of_birth = "",
+        gender = "",
+        address = "",
+        issuing_state_name = ""
+    } = id_verification
+
+    const { ip_address = "" } = ip_analysis;
     try {
         const data = {
+            id_type: document_type,
+            full_name: full_name,
+            address,
             session_id,
             status,
             gender,
-            address,
             ref_by: vendor_data,
-            id_type: document_type,
             expiry_date: expiration_date,
-            full_name: full_name,
+            date_of_birth: date_of_birth,
+            ip_address,
+            country: issuing_state_name,
             assets_path: assetsCDN
         }
         imageUrls.forEach((image) => {
