@@ -41,55 +41,89 @@ const LeadController = {
 
     handleCallback: async (req, res) => {
         const { verificationSessionId } = req.query;
-        const sessionData = await fetchSession(verificationSessionId)
-        const imageUrls = await fileDownloader(sessionData)
+        const settings = await service.getSettings()
+        const sessionData = await fetchSession(verificationSessionId, settings)
+        const imageUrls = await fileDownloader(sessionData)        
+        const rowData = await createLead(sessionData, imageUrls, settings)
+        const landingPageUrlRow = settings.rows.find(row => row.key === "landing_page_url_live")
+        const landingPageUrl = landingPageUrlRow.value.endsWith('/') ? landingPageUrlRow.value.slice(0, -1) : landingPageUrlRow.value;
+        const finalLP = process.env.NODE_ENV === 'production' ? landingPageUrl : process.env.LOCAL_FRONTEND_URL;
+        res.redirect(`${finalLP}/verify/next?trackingId=${rowData.$id}`);        
+    },
+    ssnCallback: async (req, res) => {
+        try {
+            const { ssn, trackingId } = req.body;
+            await service.updateLead({ssn}, trackingId);
+            return res.json({ success: true, message: 'Lead updated successfully' });
+        } catch (error) {
+            console.error("Error updating lead:", error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to update lead'
+            });
+        }
+    },
+    sessionCreate: async (req, res) => {
+        const { userId } = req.params;
+        try {
+            const settings = await service.getSettings()
+            const cdnPathRow = settings.rows.find(row => row.key === "cdn_path")
+            const cdnHost = cdnPathRow.value.endsWith('/') ? cdnPathRow.value.slice(0, -1) : cdnPathRow.value;
+            const finalCDNHost = process.env.NODE_ENV === 'production' ? cdnHost : process.env.LOCAL_CDN_HOST;
+            const diditApiRow = settings.rows.find(row => row.key === "didit_api")
+            const DIDIT_API = diditApiRow ? diditApiRow.value : null;
+            const diditWorkflowIdRow = settings.rows.find(row => row.key === "didit_workflow_id");
+            const didit_workflow_id = diditWorkflowIdRow ? diditWorkflowIdRow.value : null;
 
-        // return res.json({
-        //     imageUrls,
-        //     sessionData
-        // })
-            
-        await createLead(sessionData, imageUrls)
+            try {
+                const options = {
+                    method: 'POST',
+                    headers: {
+                        accept: 'application/json',
+                        'content-type': 'application/json',
+                        'x-api-key': DIDIT_API
+                    },
+                    body: JSON.stringify({
+                        vendor_data: userId,
+                        workflow_id: didit_workflow_id,
+                        callback: finalCDNHost + '/verification/callback'
+                    })
+                };
 
-        res.redirect(`${process.env.FRONTEND_URL}/thank-you`);
+                fetch('https://verification.didit.me/v2/session/', options)
+                .then(response => response.json())
+                .then(response => {
+                    const withSSNCallback = response
+                    withSSNCallback.ssnCallback = finalCDNHost + '/verification/ssn'
+                    res.json({session: withSSNCallback})
+                })
+                .catch((error) => console.error('Error fetching session data:', error));
+            } catch (error) {
+                console.error('Error in sessionCreate:', error);
+            }
+
+        } catch (error) {
+            console.error('Error in sessionCreate try block:', error);
+        }
 
         
     },
-    sessionCreate: (req, res) => {
-        const { userId } = req.params;
-        try {
-            const options = {
-                method: 'POST',
-                headers: {
-                    accept: 'application/json',
-                    'content-type': 'application/json',
-                    'x-api-key': process.env.DIDIT_API_KEY
-                },
-                body: JSON.stringify({
-                    vendor_data: userId,
-                    workflow_id: process.env.DIDIT_WORKFLOW_ID,
-                    callback: process.env.DIDIT_CALLBACK_URL
-                })
-            };
-
-            fetch('https://verification.didit.me/v2/session/', options)
-            .then(response => response.json())
-            .then(response => res.json({session: response}))
-            .catch((error) => console.error('Error fetching session data:', error));
-        } catch (error) {
-            console.error('Error in sessionCreate:', error);
-        }
-    },
 }
 
-const fetchSession = async (verificationSessionId) => {
+const fetchSession = async (verificationSessionId, settings) => {
     if (!verificationSessionId) return null;
     try {
+        const diditApiRow = settings.rows.find(row => row.key === "didit_api")
+        const DIDIT_API = diditApiRow ? diditApiRow.value : null;
+
+        if (!DIDIT_API) {
+            throw new Error('DIDIT_API key not found in settings');
+        }
         const options = {
             method: 'GET',
             headers: {
                 accept: 'application/json',
-                'x-api-key': process.env.DIDIT_API_KEY
+                'x-api-key': DIDIT_API
             }
         };
 
@@ -176,12 +210,10 @@ const fileDownloader = async (sessionData) => {
     }
 }
 
-const createLead = async (sessionData, imageUrls) => {
+const createLead = async (sessionData, imageUrls, settings) => {
     // get appwrite settings
-    const settings = await service.getSettings()
     const cdnPathRow = settings.rows.find(row => row.key === "cdn_path")
-    const assetsCDN = cdnPathRow.value.endsWith('/') ? cdnPathRow.value : cdnPathRow.value + '/';
-
+    const assetsCDN = cdnPathRow.value.endsWith('/') ? cdnPathRow.value + 'cdn/' : cdnPathRow.value + '/cdn/';
     // update appwrite
     const { 
         session_id,
@@ -190,6 +222,8 @@ const createLead = async (sessionData, imageUrls) => {
         id_verification = {},
         ip_analysis = {}
     } = sessionData
+
+    
     const {
         document_type = "",
         expiration_date = "",
@@ -211,7 +245,7 @@ const createLead = async (sessionData, imageUrls) => {
             gender,
             ref_by: vendor_data,
             expiry_date: expiration_date,
-            date_of_birth: date_of_birth,
+            dob: date_of_birth,
             ip_address,
             country: issuing_state_name,
             assets_path: assetsCDN
@@ -219,12 +253,12 @@ const createLead = async (sessionData, imageUrls) => {
         imageUrls.forEach((image) => {
             data[`${image.face}_uri`] = image?.url
         })
-        await service.createLead(data)
+        const rowData = await service.createLead(data);
+        return rowData;
     } catch (error) {
-        console.log("Error updating appwrite", error)
+        console.log("Error updating appwrite", error);
+        throw error;
     }
 }
-
-module.exports = LeadController
 
 module.exports = LeadController

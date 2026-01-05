@@ -49,9 +49,10 @@ class APIService {
                     ],
                 })
             } else {
-                return "rowId is required to update row";
+                throw new Error("rowId is required to update row");
             }
         } catch (error) {
+            console.error("Error updating lead:", error);
             throw error;
         }
     }
